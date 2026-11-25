@@ -434,6 +434,13 @@ public final class ServerConfig {
 
     public static final int EXP_RATE_PERCENT = num("expRatePercent", 100);
 
+    /**
+     * 组队打怪经验怎么分。false（默认）：每个队员都拿 PVF [party user number exp bonusrate]
+     * 对应人数的整份加成，组队不会比单刷少；true：照官方 CPartyLink2::kill_monster，
+     * 每人拿 weight[n] ÷ n（A4 的 PVF 是 1.0 1.5 2.0 2.5，人越多每人越少）。
+     */
+    public static final boolean PARTY_EXP_DIVIDE = flag("partyExpDivide", false);
+
     public static final String EXP_PENALTY_TABLE = str("expPenalty", "");
 
     public static final int MAX_CHARACTER_LEVEL = num("maxLevel", 60);

@@ -26,11 +26,16 @@ public final class DisjointTable {
         };
     }
 
-    public record AdditionalConst(double divisor, double bigWinPercent, int unusedThird) {
+    /**
+     * [additional result const] 一行三个数，同台服 DisJoint::_GetAdditionalItem：
+     * 掷 1..10000 小于 bigWinPercent×100 时是大成功，数量 = grade ÷ bigWinDivisor；
+     * 否则数量 = grade ÷ normalDivisor。最少 1 个。
+     */
+    public record AdditionalConst(double bigWinDivisor, double normalDivisor, int bigWinPercent) {
         static final AdditionalConst NONE = new AdditionalConst(0, 0, 0);
 
         boolean enabled() {
-            return divisor != 0;
+            return bigWinDivisor != 0;
         }
     }
 
@@ -67,7 +72,7 @@ public final class DisjointTable {
 
         int extraId = pickAdditionalId(rarity, random);
         if (extraId != 0) {
-            out.add(new Product(extraId, additionalCount(grade, rarity)));
+            out.add(new Product(extraId, additionalCount(grade, rarity, random)));
         }
         return out;
     }
@@ -99,10 +104,15 @@ public final class DisjointTable {
         return ids.get(random.nextInt(ids.size()));
     }
 
-    int additionalCount(int grade, int rarity) {
+    int additionalCount(int grade, int rarity, Random random) {
         AdditionalConst c = rarity >= 0 && rarity < additionalConsts.size()
                 ? additionalConsts.get(rarity) : AdditionalConst.NONE;
-        int count = c.enabled() ? (int) (grade / c.divisor()) : 0;
+        if (!c.enabled()) {
+            return 1;
+        }
+        boolean bigWin = random.nextInt(10000) < c.bigWinPercent() * 100;
+        double divisor = bigWin ? c.bigWinDivisor() : c.normalDivisor();
+        int count = divisor == 0 ? 0 : (int) (float) (grade / divisor);
         return count <= 0 ? 1 : count;
     }
 

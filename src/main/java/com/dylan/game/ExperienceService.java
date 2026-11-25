@@ -77,7 +77,7 @@ public final class ExperienceService {
             rate *= params.monsterExpRate()
                     * params.difficultyExpRate(difficulty)
                     * (params.partySizeExpRate(n) + partyEventBonus)
-                    / n;
+                    / (ServerConfig.PARTY_EXP_DIVIDE ? n : 1);
         }
         return rate * ExpLevelPenalty.rateOf(characterLevel, monsterLevel);
     }
