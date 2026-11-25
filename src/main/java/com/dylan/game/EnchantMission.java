@@ -23,6 +23,9 @@ public final class EnchantMission {
     private Material equipment = Material.EMPTY;
     private Material card = Material.EMPTY;
     private long recipeItemId;
+    private boolean replyOn180;
+    private boolean a4Invite;
+    private boolean enchanterConfirmed;
 
     EnchantMission(GameSession enchanter, GameSession beneficiary,
                    boolean useOtherUserMonsterCard) {
@@ -92,6 +95,33 @@ public final class EnchantMission {
 
     void card(Material value) {
         this.card = value == null ? Material.EMPTY : value;
+    }
+
+    /** A4 单人附魔窗从 CMD 180 进来，结果也回 REPLY 180（见 EnchantService.onSoloPut）。 */
+    public boolean replyOn180() {
+        return replyOn180;
+    }
+
+    void replyOn180(boolean value) {
+        this.replyOn180 = value;
+    }
+
+    /** A4 右键菜单「邀请附魔」开的双人附魔（CMD 10/11 kind 6/7），包序见 EnchantService.onInvitePeer。 */
+    public boolean a4Invite() {
+        return a4Invite;
+    }
+
+    void a4Invite(boolean value) {
+        this.a4Invite = value;
+    }
+
+    /** 附魔师已放卷轴确认（CMD 180 mode 1），客户收到了 NOTI 168 确认框。 */
+    public boolean enchanterConfirmed() {
+        return enchanterConfirmed;
+    }
+
+    void enchanterConfirmed(boolean value) {
+        this.enchanterConfirmed = value;
     }
 
     void resetCard() {
