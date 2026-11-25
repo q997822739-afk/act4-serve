@@ -62,9 +62,16 @@ public final class TradePackets {
         return new byte[]{0, (byte) E_NOT_TRADING};
     }
 
-    /** NOTI 7（0042096C kind 1）：u16 邀请人, u8 1, u32 peer, u32 时间戳。 */
+    /**
+     * 交易对方还能拿多少重量（克）。客户端锁定交易时（00476AA0）用「对方这个值 + 对方放上来的重量
+     * − 我放上去的重量 &lt; 0」判「交易对象的负重上限不足」（dnf.str 419）；值存在对方角色对象 +0x158，
+     * 只有 NOTI 7 / NOTI 8 交易那一支会写（00420B22 / 00420E56）。服务端不算负重，给一个足够大的值。
+     */
+    public static final int PEER_FREE_WEIGHT = 1_000_000;
+
+    /** NOTI 7（0042096C kind 1）：u16 邀请人, u8 1, u32 邀请人剩余负重（→ +0x158）, u32 时间戳。 */
     public static byte[] invite(int fromUid, int peer) {
-        return new PacketWriter(11).u16(fromUid).u8(KIND_TRADE).u32(peer)
+        return new PacketWriter(11).u16(fromUid).u8(KIND_TRADE).u32(PEER_FREE_WEIGHT)
                 .u32((int) (System.currentTimeMillis() / 1000)).toArray();
     }
 
@@ -73,9 +80,10 @@ public final class TradePackets {
         return new PacketWriter(5).u8(1).u16(inviterUid).u8(KIND_TRADE).u8(1).toArray();
     }
 
-    /** NOTI 8 给邀请人（00420C2F）：u16 接受方, u8 1, u8 1, u32 0。 */
+    /** NOTI 8 给邀请人（00420B2D / 00420C2F kind 1）：u16 接受方, u8 1, u32 接受方剩余负重（→ +0x158）, u8 1, u32 时间戳。 */
     public static byte[] acceptedNoti(int responderUid) {
-        return new PacketWriter(8).u16(responderUid).u8(KIND_TRADE).u8(1).u32(0).toArray();
+        return new PacketWriter(12).u16(responderUid).u8(KIND_TRADE).u32(PEER_FREE_WEIGHT).u8(1)
+                .u32((int) (System.currentTimeMillis() / 1000)).toArray();
     }
 
     /** NOTI 15（00422D9B）17 字节：u16 格, u32 itemId（0xFFFF = 清空）, u32 数量, u8 attr, u16 耐久, u32 强化。 */

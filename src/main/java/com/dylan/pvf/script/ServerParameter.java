@@ -357,7 +357,8 @@ public final class ServerParameter {
     @Override
     public String toString() {
         return "打怪 ×" + monsterExpRate + "、通关 ×" + clearExpRate
-                + "、人数 " + partySizeExpRates + "（每人拿 weight[n]÷n）"
+                + "、人数 " + partySizeExpRates
+                + (com.dylan.net.ServerConfig.PARTY_EXP_DIVIDE ? "（每人拿 weight[n]÷n）" : "（每人拿 weight[n]）")
                 + "、难度 " + difficultyExpRates
                 + "、怪物类型 " + monsterKindExpRates + "（命名怪再 ×3）"
                 + "、评级加成 " + clearRankExpRates
