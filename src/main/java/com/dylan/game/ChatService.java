@@ -214,6 +214,9 @@ public final class ChatService {
             // 城镇队伍（PartyInviteService）优先；没有就是 A5 的单人副本队伍
             java.util.List<GameSession> town = PartyInviteService.members(s);
             to.addAll(town.isEmpty() ? s.party().chatRecipients() : town);
+        } else if (type == ChatType.NORMAL && s.inPvpRoom()) {
+            // 决斗房间里：只发同房间座位上的人（房间里的人不在大厅区域名单里）
+            to.addAll(PvpLobby.roomMates(s));
         } else if (type == ChatType.NORMAL) {
             to.addAll(SessionRegistry.inArea(p.town(), p.area(), s));
         } else if (type == A4_GUILD) {
@@ -339,11 +342,21 @@ public final class ChatService {
             return 1;
         }
         // A4：CMD 17（qol 聊天框从 011001CE 发）原来只回给自己 → 同区域的人也发（和 onA4Chat 的 NORMAL 一样）
+        int sent = 1;
+        if (s.inPvpRoom()) {
+            // 决斗房间里的人不在大厅区域名单里，只发同房间座位上的人
+            for (GameSession mate : PvpLobby.roomMates(s)) {
+                if (mate != s) {
+                    mate.sendNow(notiId, body);
+                    sent++;
+                }
+            }
+            return sent;
+        }
         SessionRegistry.Presence p = SessionRegistry.presenceOf(s);
         if (p == null || !p.inTown()) {
             return 1;
         }
-        int sent = 1;
         for (GameSession o : SessionRegistry.inArea(p.town(), p.area(), s)) {
             o.sendNow(notiId, body);
             sent++;

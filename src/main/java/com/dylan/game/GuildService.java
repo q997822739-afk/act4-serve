@@ -413,8 +413,8 @@ public final class GuildService {
             return;
         }
         db(s).leave(victim.characNo());
-        // 第二段是踢人者，第一段是被踢的人。
-        s.reply(164, secedeOk(2, s.characName(), victim.name()));
+        // 0x1A2D「玩家[%s]已被强行退出[%s]公会」：第一段公会名，第二段被踢的人（00418FB0 / 00418FC9 / 00419003）。
+        s.reply(164, secedeOk(2, victim.name(), g.get().name()));
         CharacterService.resendOwnCharacterInfo(s, "请出成员");
         GameSession v = SessionRegistry.findByName(target);
         if (v != null) {
@@ -498,11 +498,12 @@ public final class GuildService {
         }
         INVITES.put(target, s);
         s.reply(162, ok());
-        // NOTI 159（0042BFFB）：str 邀请人名, str 公会名
+        // NOTI 159（0042BFFB）：str 公会名（容量 0x32）, str 邀请人名（容量 0x80）。
+        // 0x19AA「玩家[%s]邀请您加入[%s]公会…[%s]」的参数是 第二段, 第一段, 第一段（0042C053..0042C07E）。
         byte[] who = s.characName().getBytes(PacketWriter.DEFAULT_CHARSET);
         byte[] gn = g.get().name().getBytes(PacketWriter.DEFAULT_CHARSET);
         target.sendNow(159, new PacketWriter(8 + who.length + gn.length)
-                .u32(who.length).bytes(who).u32(gn.length).bytes(gn).toArray());
+                .u32(gn.length).bytes(gn).u32(who.length).bytes(who).toArray());
     }
 
     public static void answer(GameSession s, byte[] body) {

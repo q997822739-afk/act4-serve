@@ -88,6 +88,7 @@ public final class GameScripts implements Closeable {
     private com.dylan.pvf.script.QuestParameterScript questParameter;
     private com.dylan.pvf.script.LevelRewardTable levelReward = com.dylan.pvf.script.LevelRewardTable.empty();
     private com.dylan.pvf.script.GuildParameter guildParameter = com.dylan.pvf.script.GuildParameter.defaults();
+    private com.dylan.pvf.script.PvpRefTable pvpRef = com.dylan.pvf.script.PvpRefTable.empty();
 
     private com.dylan.pvf.script.QuestMappingTable questMapping;
 
@@ -275,6 +276,12 @@ public final class GameScripts implements Closeable {
                         archive.readText(com.dylan.pvf.script.GuildParameter.PATH));
             } catch (RuntimeException ex) {
                 scripts.guildParameter = com.dylan.pvf.script.GuildParameter.defaults();
+            }
+            try {
+                scripts.pvpRef = com.dylan.pvf.script.PvpRefTable.parse(
+                        archive.readText(com.dylan.pvf.script.PvpRefTable.PATH));
+            } catch (RuntimeException ex) {
+                scripts.pvpRef = com.dylan.pvf.script.PvpRefTable.empty();
             }
             scripts.questMapping = loadQuestMapping(archive);
             scripts.clearReward = loadClearReward(archive);
@@ -790,6 +797,10 @@ public final class GameScripts implements Closeable {
 
     public com.dylan.pvf.script.GuildParameter guildParameter() {
         return guildParameter;
+    }
+
+    public com.dylan.pvf.script.PvpRefTable pvpRef() {
+        return pvpRef;
     }
 
     public com.dylan.pvf.script.ClearRewardTable clearReward() {

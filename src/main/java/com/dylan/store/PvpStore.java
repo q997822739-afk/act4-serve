@@ -63,6 +63,41 @@ public final class PvpStore extends DomainStore {
         }
     }
 
+    public long pvpPoint(int characNo) {
+        String sql = "SELECT pvp_point FROM pvp_result WHERE charac_no = ?";
+        try (Connection c = connection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, characNo);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getLong(1) : 0L;
+            }
+        } catch (SQLException e) {
+            throw new StoreException("读 charac_no=" + characNo + " 的决斗经验失败："
+                    + e.getMessage(), e);
+        }
+    }
+
+    /** 一局结束连同奖励：胜点写绝对值，决斗经验 pvp_point 写绝对值、段位 pvp_grade 一起写，一条 UPDATE。 */
+    public boolean recordMatchReward(int characNo, int winAdd, int loseAdd, long winPoint,
+                                     long pvpPoint, int grade) {
+        String sql = "UPDATE pvp_result SET win = win + ?, lose = lose + ?,"
+                + " pvp_count = pvp_count + 1, play_count = play_count + 1, win_point = ?,"
+                + " pvp_point = ?, pvp_grade = ? WHERE charac_no = ?";
+        try (Connection c = connection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, winAdd);
+            ps.setInt(2, loseAdd);
+            ps.setLong(3, Math.clamp(winPoint, 0, 0xFFFF_FFFFL));
+            ps.setLong(4, Math.clamp(pvpPoint, 0, Integer.MAX_VALUE));
+            ps.setInt(5, Math.clamp(grade, 0, 0xFF));
+            ps.setInt(6, characNo);
+            return ps.executeUpdate() == 1;
+        } catch (SQLException e) {
+            throw new StoreException("写 charac_no=" + characNo + " 的决斗结算失败："
+                    + e.getMessage(), e);
+        }
+    }
+
     /** 一局结束。胜点写绝对值；胜、负场各加 0 或 1。平局两个增量都是 0，场次仍加 1。 */
     public boolean recordMatch(int characNo, int winAdd, int loseAdd, long winPoint) {
         String sql = "UPDATE pvp_result SET win = win + ?, lose = lose + ?,"

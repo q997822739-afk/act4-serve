@@ -99,6 +99,17 @@ public final class GameSession {
         this.channelKind = value;
     }
 
+    private volatile boolean inPvpRoom;
+
+    /** 坐在决斗房间里（PvpLobby.hideInRoom / showInLobby）。这期间不出现在角斗场大厅的区域名单里。 */
+    public boolean inPvpRoom() {
+        return inPvpRoom;
+    }
+
+    public void inPvpRoom(boolean value) {
+        this.inPvpRoom = value;
+    }
+
     /** 这条连接在决斗频道（频道类型 4/5/6/7/…，见 {@link GameChannel}）。 */
     public boolean pvpChannel() {
         return GameChannel.isPvpKind(channelKind);

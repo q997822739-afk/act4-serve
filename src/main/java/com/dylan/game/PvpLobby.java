@@ -143,8 +143,31 @@ public final class PvpLobby {
 
     private static final int NAME_ROOM = 29;
 
-    /** 胜方加的胜点。数额客户端没有常量，取 10，让「获得%d点决斗胜点」不是 0。负和平局加 0。 */
-    private static final int WIN_GAIN = 10;
+    /**
+     * 修炼场奖励（官方新手引导口径）：胜方每个对手 4 点胜点、经验每个对手 1000；败方 1 点胜点、没有经验；平局都是 0。
+     * 只有 51 初级 / 52 下级 / 53 中级修炼场发，55 自由练习场、59 公会赛场不发。
+     */
+    static final int WIN_POINT_PER_OPPONENT = 4;
+
+    static final int LOSE_POINT = 1;
+
+    static final int WIN_EXP_PER_OPPONENT = 1000;
+
+    static boolean isRewardChannel(GameSession s) {
+        int ch = com.dylan.net.ServerConfig.a4ChannelForPort(s.localPort());
+        return ch == 51 || ch == 52 || ch == 53;
+    }
+
+    private static int opponentsOf(Room room, int seat) {
+        int n = 0;
+        for (int i = 0; i < Room.SEATS; i++) {
+            if (i != seat && room.seats[i] > 0 && !Room.observer(room.team[i])
+                    && room.sideOf(i) != room.sideOf(seat)) {
+                n++;
+            }
+        }
+        return Math.max(1, n);
+    }
 
     private static final int PHASE_LOBBY = 0;
     private static final int PHASE_FIGHT = 1;
@@ -191,6 +214,32 @@ public final class PvpLobby {
         armModeButtons(s, room);
         s.reply(53, new byte[] {1});
         s.flush();
+        hideInRoom(s);
+    }
+
+    /**
+     * 进房：同区域的人把这个角色从大厅场景收掉（NOTI 23 报 area 255，00423D50 比 town/area），
+     * 并打上 inPvpRoom，之后谁重建区域名单都不会把他投影回大厅。
+     */
+    static void hideInRoom(GameSession s) {
+        if (s == null || s.inPvpRoom()) {
+            return;
+        }
+        s.inPvpRoom(true);
+        SessionRegistry.Presence p = SessionRegistry.presenceOf(s);
+        if (p != null && p.inTown()) {
+            NeighborService.leaveArea(s, p.town(), p.area(), NeighborService.departed(p));
+        }
+    }
+
+    /** 出房（自己退 / 被踢）：清标记，重新进一次大厅区域，自己收名册、别人重新看到他。 */
+    static void showInLobby(GameSession s, String why) {
+        if (s == null) {
+            return;
+        }
+        s.inPvpRoom(false);
+        NeighborService.replayAreaToSelf(s);
+        NeighborService.enterArea(s, why);
     }
 
     public static void enter(GameSession s, byte[] body) {
@@ -218,6 +267,7 @@ public final class PvpLobby {
         }
         s.reply(54, entered(room));
         s.flush();
+        hideInRoom(s);
     }
 
     /**
@@ -295,7 +345,7 @@ public final class PvpLobby {
         dropSeat(room, seat, victim);
         if (target != null) {
             INVITES.remove(target);
-            NeighborService.replayAreaToSelf(target);
+            showInLobby(target, "被踢出决斗房间");
         }
     }
 
@@ -314,7 +364,7 @@ public final class PvpLobby {
         }
         dropSeat(room, seat, s.characNo());
         replyOk(s, 55);
-        NeighborService.replayAreaToSelf(s);
+        showInLobby(s, "离开决斗房间");
     }
 
     /**
@@ -612,6 +662,7 @@ public final class PvpLobby {
     }
 
     public static void onLeaveWorld(GameSession s) {
+        s.inPvpRoom(false);
         INVITES.remove(s);
         int uid = s.uniqueId();
         INVITES.entrySet().removeIf(e -> e.getValue().inviterUid == uid);
@@ -733,6 +784,7 @@ public final class PvpLobby {
         if (fresh) {
             armModeButtons(s, room);
         }
+        hideInRoom(s);
     }
 
     /**
@@ -933,17 +985,26 @@ public final class PvpLobby {
             int seat = room.seatIndex(member.characNo());
             boolean win = seat >= 0 && room.win[seat];
             boolean lose = seat >= 0 && !win && !Room.observer(room.team[seat]) && shown != 0xFF;
-            int gain = win ? WIN_GAIN : 0;
+            boolean rewarded = isRewardChannel(member);
+            int opponents = seat >= 0 ? opponentsOf(room, seat) : 1;
+            int gain = !rewarded ? 0 : win ? WIN_POINT_PER_OPPONENT * opponents : lose ? LOSE_POINT : 0;
+            int expGain = rewarded && win ? WIN_EXP_PER_OPPONENT * opponents : 0;
             long next = Math.min(0xFFFF_FFFFL, member.winPoint() + gain);
             member.winPoint(next);
             try {
                 if (member.store() != null && member.characNo() > 0) {
-                    member.store().pvp().recordMatch(member.characNo(), win ? 1 : 0, lose ? 1 : 0, next);
+                    var pvp = member.store().pvp();
+                    long pvpPoint = pvp.pvpPoint(member.characNo()) + expGain;
+                    var table = member.scripts() == null ? null : member.scripts().pvpRef();
+                    int grade = table == null || table.isEmpty()
+                            ? pvp.grade(member.characNo()) : table.gradeOf(pvpPoint);
+                    pvp.recordMatchReward(member.characNo(), win ? 1 : 0, lose ? 1 : 0, next,
+                            pvpPoint, grade);
                 }
             } catch (RuntimeException ignored) {
                 // 结算包照发。库写失败不该把客户端停在决斗里。
             }
-            member.sendNow(NOTI_RESULT, resultBody(room, member, shown, gain, next));
+            member.sendNow(NOTI_RESULT, resultBody(room, member, shown, expGain, next));
         }
     }
 
@@ -1009,14 +1070,15 @@ public final class PvpLobby {
 
     /**
      * NOTI 47（{@code 00429FF0}）。
-     * 头：u8 胜者座位（{@code 00968B60} 把它交进去，平局写 0xFF）、u32 未知写 0、
-     * u8 自己的 {@code pvp_grade}（写本地 +0xCC，不能无故写成 0）、u32 自己的胜点总数
-     * （行是自己时再进 {@code 0041E240}）、u8 人数。
+     * 头：u8 胜者座位（{@code 00968B60} 把它交进去，平局写 0xFF）、u32 自己的胜点新总数
+     * （{@code 00966D10} 减客户端旧总数得「获得%d点决斗胜点」）、
+     * u8 自己的 {@code pvp_grade}（写本地 +0xCC，不能无故写成 0）、u32 本局决斗经验增量
+     * （{@code 0041E240} 加到 +0x6F8，「获得%d点决斗经验值」）、u8 人数。
      * 每人：u16 连接号、u32 未知（胜 1 负 0）、u8 那个人的段位、5 个 u32 未知写 0。
-     * 尾：u16 本局获得的胜点（{@code 0041E5C0}）、u16 MVP 连接号（0xFFFF 跳过 MVP 窗）、
+     * 尾：u16 写 0（{@code 0041E5C0}）、u16 MVP 连接号（0xFFFF 跳过 MVP 窗）、
      * u32 经验写 0（{@code 0041E5B0}）、u8 0（{@code 0041E5D0}）。
      */
-    private static byte[] resultBody(Room room, GameSession self, int shown, int gain, long total) {
+    private static byte[] resultBody(Room room, GameSession self, int shown, int expGain, long total) {
         int rows = 0;
         for (int i = 0; i < Room.SEATS; i++) {
             if (room.seats[i] > 0) {
@@ -1025,9 +1087,9 @@ public final class PvpLobby {
         }
         PacketWriter w = new PacketWriter();
         w.u8(shown);
-        w.u32(0);
-        w.u8(gradeOf(self));
         w.u32((int) Math.min(total, 0xFFFF_FFFFL));
+        w.u8(gradeOf(self));
+        w.u32(expGain);
         w.u8(rows);
         int mvp = 0xFFFF;
         for (int i = 0; i < Room.SEATS; i++) {
@@ -1045,7 +1107,7 @@ public final class PvpLobby {
                 w.u32(0);
             }
         }
-        w.u16(gain);
+        w.u16(0);
         w.u16(mvp);
         w.u32(0);
         w.u8(0);

@@ -268,6 +268,7 @@ public final class SessionRegistry {
             // 2026-10-28 用户实测「赛丽亚房间能看到其他玩家」，之前对 A4 放开是错的。
             // 一个端口一个频道。城镇 7002 和角斗场 7004 的区域号会撞上，不能互相看见。
             if (s == except || p == null || !s.isActive() || s.localPort() != except.localPort()
+                    || s.inPvpRoom()
                     || !p.inTown()
                     || p.privateArea()
                     || p.identity() == null || p.town() != town || p.area() != area) {
