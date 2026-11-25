@@ -1,0 +1,12 @@
+[Unit]
+Description=A5-for-A4 DNF game server
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/a4server
+ExecStart=/bin/sh -c 'exec /opt/java/current/bin/java -Xmx768m -Dfile.encoding=UTF-8 -Ds1a5.port=7002 -Ds1a5.clientDir=/opt/a4server/client -Ds1a5.dbUrl=jdbc:sqlite:data/s1a5.db -Ds1a5.logDir=logs -Ds1a5.wireTrace=1 -Ds1a5.dbAutoCreateAccount=1 -Ds1a5.loginMode=token -Ds1a5.loginPasswordFallback=1 -Ds1a5.hackPunishPoint=0 -Ds1a5.peer.host=<NEW_SERVER_IP> -jar s1a5-all.jar 7002 >> logs/live.out 2>> logs/live.err'
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
