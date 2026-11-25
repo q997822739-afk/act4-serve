@@ -81,6 +81,11 @@ public final class PeerHandler implements CommandHandler {
             }
             return;
         }
+        if (com.dylan.game.EnchantService.isInviteKind(req.kind())) {
+            // 右键菜单「邀请附魔」：kind 7 附魔师邀请客户、kind 6 客户邀请附魔师
+            com.dylan.game.EnchantService.onInvitePeer(session, packetId, req);
+            return;
+        }
         if (req.kind() == TradePackets.KIND_PARTY || req.kind() == 2 || req.kind() == 3) {
             // 决斗频道类型 4 的邀请按钮是 kind 2（00917920：u16 目标、u8 2、u32 0）。
             // 人已经坐在房间里才由 PvpLobby 接。没入座的 kind 2/3 仍回「对方已退出」，不建城镇队伍。

@@ -298,8 +298,8 @@ public record Noti2OwnCharacterEntry(
     /**
      * A4 子类型 0 在 nameBadge 之后：没有 ACT5 的 blackCount（field_scan guild.add：公会号后紧跟
      * 公会等级 + 公会名），公会名之后是 29 字节（客户端 0041FBBE..0041FEA1），读取序列 u32 u8 u8 u32 u8 u32 u32 u32 u8 u16 u8 u16。
-     * 已验证的只有 +6 起的 u32 = 强化熟练度（characters.enchant_expertness → +67）和末尾 u16 = 心情
-     * （characters.mood → +88，与 ACT5 emotion 同义）。其余照官方新角色的字节填，含义未知：
+     * 已验证：+5 u8 副职业号、+6 起的 u32 副职业熟练度、+23 u8 体力百分比、倒数第 5 字节起的 u16 燃烧疲劳、
+     * 末尾 u16 = 心情（characters.mood → +88，与 ACT5 emotion 同义）。其余照官方新角色的字节填，含义未知：
      * +0 u32 恒为 0x101（官方 44 份样本：session_replay 23 份 + 满级假人 20 个角色 + 新角色，全是 01 01 00 00），
      * +10 恒为 06。
      */
@@ -308,13 +308,16 @@ public record Noti2OwnCharacterEntry(
         w.string(guildName);
         w.u32(A4_UNKNOWN_0);
         w.u8(0);
-        w.u8(0);
-        w.u32(0);
+        // 副职业号 + 熟练度：客户端 0x41FC0A / 0x41FC16 读 → 角色 record +0x138 / +0x13C。
+        // 右键菜单靠它判断对方是不是附魔师（「邀请附魔」），附魔确认窗按熟练度算成功率，0 时确定按钮是灰的。
+        w.u8(expertJobType);
+        w.u32((int) expertJobExp);
         w.u8(A4_UNKNOWN_10);
         w.u32(0);
         w.u32(0);
         w.u32(0);
-        w.u8(0);
+        // 城镇头像血条（角色对象 +0x118）：体力百分比，0x41FE0A
+        w.u8(Math.max(0, Math.min(100, stamina)));
         // 客户端 0x41FE29 读这个 u16 → sub_5394B0 存到角色对象，按燃烧疲劳档位给这个角色染色。
         // 以前固定 0：自己靠 NOTI 36 能变色，同屏别人看你永远不染色。调用方只在燃烧疲劳活动开着时填累计疲劳。
         w.u16(usedFatigue);
