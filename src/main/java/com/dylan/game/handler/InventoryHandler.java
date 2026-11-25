@@ -185,6 +185,15 @@ public final class InventoryHandler implements CommandHandler {
                     Cmd20ReplyBody.rejected(Cmd20ReplyBody.ERROR_SILENT, listType));
             return;
         }
+        if (listType == ItemListType.LIST_MAIN
+                && com.dylan.game.StallService.hasStall(session)) {
+            // 货架按背包槽号记东西，摆摊期间整理会把槽号打乱（收摊后再整理）
+            session.reply(Cmd20ReplyBody.PACKET_ID,
+                    Cmd20ReplyBody.rejected(Cmd20ReplyBody.ERROR_SILENT, listType));
+            com.dylan.game.ChatService.system(session, "摆摊期间不能整理物品栏，请收摊后再整理");
+            session.flush();
+            return;
+        }
         if (!session.inventory().sort(listType)) {
             session.reply(Cmd20ReplyBody.PACKET_ID,
                     Cmd20ReplyBody.rejected(Cmd20ReplyBody.ERROR_SILENT, listType));

@@ -69,6 +69,29 @@ public final class StallService {
     private static final Map<GameSession, Stall> STALLS = new ConcurrentHashMap<>();
     private static final Map<GameSession, Stall> VIEWING = new ConcurrentHashMap<>();
 
+    /** 摆着摊（开摊到收摊之间）。这期间不让整理背包：货架记的是背包槽号，整理会把槽号打乱。 */
+    public static boolean hasStall(GameSession s) {
+        return STALLS.containsKey(s);
+    }
+
+    /**
+     * 开张后货架上的东西：背包槽 → 件数。服务端背包里还留着它们，但客户端已经把它们挪进了货架窗口，
+     * 这期间给客户端发主背包（整栏或单格）时要扣掉，否则客户端背包和货架各算一份，收摊时提示超负重。
+     */
+    public static Map<Integer, Integer> heldOnShelf(GameSession s) {
+        Stall st = STALLS.get(s);
+        if (st == null || !st.open) {
+            return Map.of();
+        }
+        Map<Integer, Integer> held = new java.util.HashMap<>();
+        synchronized (LOCK) {
+            for (Entry e : st.shelf.values()) {
+                held.merge(e.bagSlot(), e.count(), Integer::sum);
+            }
+        }
+        return held;
+    }
+
     // ---- CMD 88 开摊 ----
     public static void create(GameSession s, PrivateStorePackets.CreateRequest req) {
         if (!s.hasCharacter()) {

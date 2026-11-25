@@ -1048,7 +1048,7 @@ public final class InventoryService {
             case ItemListType.LIST_MAIN -> items == null
                     ? Noti13ItemListBody.empty(ItemListType.LIST_MAIN)
                     : Noti13ItemListBody.of(ItemListType.LIST_MAIN,
-                            mainBagOf(session == null ? 0 : session.winPoint(), scripts));
+                            hideShelf(mainBagOf(session == null ? 0 : session.winPoint(), scripts)));
             case ItemListType.LIST_CARGO -> Noti13ItemListBody.cargo(
                     cargo == null ? 0 : cargo.usableSlots(),
                     cargo == null ? List.of() : plainItems(cargo.items(), 0, scripts));
@@ -1068,6 +1068,49 @@ public final class InventoryService {
         }
     }
 
+    /** 摆摊开张期间，主背包里在货架上的件数不发给客户端（StallService.heldOnShelf）。 */
+    private List<Noti13ItemListBody.Item> hideShelf(List<Noti13ItemListBody.Item> list) {
+        Map<Integer, Integer> held = session == null ? Map.of() : StallService.heldOnShelf(session);
+        if (held.isEmpty()) {
+            return list;
+        }
+        List<Noti13ItemListBody.Item> out = new ArrayList<>(list.size());
+        for (Noti13ItemListBody.Item it : list) {
+            Noti13ItemListBody.Item shown = minusShelf(it, held);
+            if (shown != null) {
+                out.add(shown);
+            }
+        }
+        return out;
+    }
+
+    private Noti13ItemListBody.Item hideShelf(Noti13ItemListBody.Item it) {
+        Map<Integer, Integer> held = session == null ? Map.of() : StallService.heldOnShelf(session);
+        if (held.isEmpty()) {
+            return it;
+        }
+        Noti13ItemListBody.Item shown = minusShelf(it, held);
+        return shown != null ? shown : new Noti13ItemListBody.Item(it.slot(),
+                Noti14UpdateItemListBody.EMPTY_SLOT_ITEM_ID,
+                0, 0, 0, Noti13ItemListBody.SEAL_UNSEALED, 0, 0, 0);
+    }
+
+    /** 扣掉货架上的件数；整格都在货架上返回 null。 */
+    private Noti13ItemListBody.Item minusShelf(Noti13ItemListBody.Item it, Map<Integer, Integer> held) {
+        Integer onShelf = held.get(it.slot());
+        if (onShelf == null || BagLayout.isCurrencySlot(it.slot())) {
+            return it;
+        }
+        ItemArray bag = containerOf(ItemListType.LIST_MAIN);
+        InvenItem raw = bag == null || it.slot() >= bag.slots() ? InvenItem.EMPTY : bag.get(it.slot());
+        if (raw.isEmpty() || raw.equipable() || onShelf >= it.quantity()) {
+            return null;
+        }
+        return new Noti13ItemListBody.Item(it.slot(), it.itemId(), it.quantity() - onShelf,
+                it.itemAttr(), it.durability(), it.sealFlag(), it.enchant(),
+                it.amplifyType(), it.amplifyValue());
+    }
+
     public void sendItemUpdate(int listType, String why, int... slots) {
         if (session == null || slots == null || slots.length == 0) {
             return;
@@ -1078,7 +1121,7 @@ public final class InventoryService {
             if (item == null) {
                 continue;
             }
-            items.add(item);
+            items.add(listType == ItemListType.LIST_MAIN ? hideShelf(item) : item);
         }
         if (items.isEmpty()) {
             return;

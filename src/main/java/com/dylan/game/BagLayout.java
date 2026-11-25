@@ -86,9 +86,13 @@ public final class BagLayout {
         return -1;
     }
 
+    /**
+     * 叠加时找同类堆的范围。同台服 CInventory::insertItemIntoInventory：非装备先找快捷栏 3..8
+     * 里的同类堆（stackInvenItemIntoQuickSlot，材料被玩家拖到快捷栏也算），再找本页。
+     */
     public static Section[] stackSections(ItemScript script) {
         Section home = of(script);
-        return home == TAB2 ? new Section[]{QUICK, home} : new Section[]{home};
+        return home == TAB1 ? new Section[]{home} : new Section[]{QUICK, home};
     }
 
     public static int freeSlots(Section section, java.util.function.IntPredicate occupied) {
