@@ -154,8 +154,48 @@ public final class PvpLobby {
     static final int WIN_EXP_PER_OPPONENT = 1000;
 
     static boolean isRewardChannel(GameSession s) {
-        int ch = com.dylan.net.ServerConfig.a4ChannelForPort(s.localPort());
+        return isRewardPort(s.localPort());
+    }
+
+    static boolean isRewardPort(int port) {
+        int ch = com.dylan.net.ServerConfig.a4ChannelForPort(port);
         return ch == 51 || ch == 52 || ch == 53;
+    }
+
+    /**
+     * 开打后中途退出 / 掉线的人：人已经不在座位上，结算循环轮不到他，照官方 leave_room（离开 = 阵亡出局）记一场败，
+     * 修炼场照败方给 1 胜点。决斗经验、段位不变。
+     */
+    private static void recordDeserters(Room room, List<GameSession> present) {
+        com.dylan.store.GameStore store = null;
+        for (GameSession m : present) {
+            if (m.store() != null) {
+                store = m.store();
+                break;
+            }
+        }
+        for (int i = 0; i < Room.SEATS; i++) {
+            int no = room.fighters[i];
+            room.fighters[i] = 0;
+            if (no <= 0 || room.seatIndex(no) >= 0) {
+                continue;
+            }
+            GameSession online = findCharac(no);
+            com.dylan.store.GameStore db = online != null && online.store() != null ? online.store() : store;
+            if (db == null) {
+                continue;
+            }
+            try {
+                var pvp = db.pvp();
+                long next = Math.min(0xFFFF_FFFFL, pvp.winPoint(no) + (isRewardPort(room.port) ? LOSE_POINT : 0));
+                pvp.recordMatchReward(no, 0, 1, next, pvp.pvpPoint(no), pvp.grade(no));
+                if (online != null) {
+                    online.winPoint(next);
+                }
+            } catch (RuntimeException ignored) {
+                // 记不上不影响在场的人结算
+            }
+        }
     }
 
     private static int opponentsOf(Room room, int seat) {
@@ -836,6 +876,7 @@ public final class PvpLobby {
         room.playMap = pickMap(host, room);
         for (int i = 0; i < Room.SEATS; i++) {
             room.win[i] = room.seats[i] > 0;
+            room.fighters[i] = room.seats[i] > 0 && !Room.observer(room.team[i]) ? room.seats[i] : 0;
             room.kills[i] = 0;
             room.rankRecv[i] = false;
             room.endRecv[i] = false;
@@ -981,7 +1022,9 @@ public final class PvpLobby {
                 break;
             }
         }
-        for (GameSession member : members(room)) {
+        List<GameSession> present = members(room);
+        recordDeserters(room, present);
+        for (GameSession member : present) {
             int seat = room.seatIndex(member.characNo());
             boolean win = seat >= 0 && room.win[seat];
             boolean lose = seat >= 0 && !win && !Room.observer(room.team[seat]) && shown != 0xFF;
@@ -1501,6 +1544,8 @@ public final class PvpLobby {
         /** 官方 P_WIN：决斗中是「还活着」，分出胜负后改成「赢了」。 */
         final boolean[] win = new boolean[SEATS];
         final int[] kills = new int[SEATS];
+        /** 开打时每个座位上参战的角色号（观战 0）。中途退出 / 掉线的人结算时照样记败场。 */
+        final int[] fighters = new int[SEATS];
         /** 官方 m_recvFlagB4（CMD 61）/ m_recvFlagBC（CMD 60）。 */
         final boolean[] rankRecv = new boolean[SEATS];
         final boolean[] endRecv = new boolean[SEATS];

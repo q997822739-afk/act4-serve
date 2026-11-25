@@ -270,7 +270,9 @@ public final class QuestService {
         }
         return switch (type) {
             case CLEAR_MAP -> matchesCurrentDungeon(s, quest);
-            case PVP_RANK -> false;
+            // 台服 UserQuest::check_quest_type_condition case 5：int data 第一个 ≤ 决斗段位
+            case PVP_RANK -> !quest.intData().isEmpty() && s.store() != null && s.characNo() > 0
+                    && quest.intData().get(0) <= s.store().pvp().grade(s.characNo());
             case SEEKING, CONDITION_UNDER_CLEAR, HUNT_MONSTER, MEET_NPC, HUNT_ENEMY,
                  AMPLIFY_ITEM, SEEK_N_MEET_NPC -> true;
             default -> {

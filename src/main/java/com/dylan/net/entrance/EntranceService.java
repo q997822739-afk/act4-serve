@@ -221,6 +221,8 @@ public final class EntranceService {
                     logger.accept("套用 pvp_channels.etc 规则：" + text.length() + " → "
                             + rewritten.length() + " 字节（A12 生产日志是 3173）");
                     text = rewritten;
+                    // 协议 9 发的也要是改写后的字节，否则客户端拿到的决斗频道段位区间还是全 0
+                    rawScript = rewritten.getBytes(StandardCharsets.ISO_8859_1);
                 }
                 logger.accept("channel_info.etc 解出 " + raw.length + " 字节");
                 loaded = channels.loadScript(text, group, logger);
